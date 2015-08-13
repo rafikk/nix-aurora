@@ -27,7 +27,7 @@ let
     };
   };
 
-in aurora.Job {
+in aurora.Service {
   cluster = "devcluster";
   environment = "devel";
   role = "www-data";

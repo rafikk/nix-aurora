@@ -75,6 +75,8 @@ rec {
       '';
     };
 
+  Service = attrs: Job (attrs // { service = true; });
+
   Task =
     { name ? (builtins.head processes).name
     , processes
