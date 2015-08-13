@@ -25,10 +25,6 @@ let
       ram = 1 * aurora.utils.MB;
       disk = 8 * aurora.utils.MB;
     };
-    constraints = {
-      host = "limit:4";
-      rack = "limit:100";
-    };
   };
 
 in aurora.Job {

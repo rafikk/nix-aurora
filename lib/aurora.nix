@@ -39,34 +39,52 @@ rec {
     };
 
   _config = attrs:
-    pkgs.writeTextFile {
+
+    let
+      processes = map
+        (p: rec { inherit (p) name; cmdline = "exec ${name}"; })
+        attrs.task.processes;
+
+      job_config = attrs // {
+        task = attrs.task // { inherit processes; };
+      };
+
+    in pkgs.writeTextFile {
       name = with attrs; "aurora-config-${cluster}-${role}-${environment}-${name}";
-      text = builtins.toJSON attrs;
+      text = builtins.toJSON job_config;
       destination = "/config.json";
     };
 
   _sandbox = attrs: with attrs;
-    pkgs.stdenv.mkDerivation {
+
+    let mkProcessDerivation = process: pkgs.stdenv.mkDerivation {
+      name = "aurora-process-${process.name}";
+      preferLocalBuild = true;
+      buildCommand = ''
+        mkdir -p "$(dirname "$out")"
+        echo -n "${process.cmdline}" > "$out"
+        chmod +x "$out"
+      '';
+    };
+
+    in pkgs.stdenv.mkDerivation {
       name = with attrs; "aurora-sandbox-${cluster}-${role}-${environment}-${name}";
       buildCommand = ''
         mkdir -p $out
-        ln -s ${builtins.head task.raw_processes} $out/${(builtins.head task.processes).name}
+        ${pkgs.lib.concatMapStringsSep "\n" (p: "ln -s ${mkProcessDerivation p} $out/${p.name}") task.processes}
       '';
     };
 
   Task =
     { name ? (builtins.head processes).name
     , processes
-    , resources
-    , constraints
+    , constraints ? []
+    , resources ? null
+    , max_failures ? 1
+    , max_concurrency ? 0
+    , finalization_wait ? 30
     } @ attrs:
-    {
-      inherit name resources constraints;
-      raw_processes = processes;
-      processes = map
-        (p: rec { inherit (p) name; cmdline = "exec ${name}"; })
-        processes;
-    };
+    { inherit name; } // attrs;
 
   Process =
     { cmdline
@@ -78,12 +96,7 @@ rec {
     , min_duration ? 5
     , propagatedBuildInputs ? []
     , buildInputs ? []
-    } @ attrs:
-    pkgs.writeTextFile {
-      inherit name;
-      executable = true;
-      text = cmdline;
-    } // attrs;
+    } @ attrs: attrs;
 
   Resources =
     { cpu
