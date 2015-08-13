@@ -36,9 +36,4 @@ in aurora.Job {
   environment = "devel";
   role = "www-data";
   task = helloWorldTask;
-  update_config = aurora.UpdateConfig {
-    batch_size = 2;
-    watch_secs = 30;
-    max_total_failures = 4;
-  };
 }
