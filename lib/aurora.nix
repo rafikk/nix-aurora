@@ -24,9 +24,9 @@ rec {
     } @ attrs:
 
     let
-      fullAttrs = { inherit name; } // attrs;
-      sandbox = _sandbox fullAttrs;
-      config = _config fullAttrs;
+      jobAttrs = { inherit name; } // attrs;
+      sandbox = _sandbox jobAttrs;
+      config = _config { inherit sandbox jobAttrs; };
 
     in pkgs.stdenv.mkDerivation {
       name = "aurora-job-${cluster}-${role}-${environment}-${name}";
@@ -38,19 +38,29 @@ rec {
       '';
     };
 
-  _config = attrs:
+  _config = { sandbox, jobAttrs }:
 
     let
-      processes = map
-        (p: rec { inherit (p) name; cmdline = "exec ${name}"; })
-        attrs.task.processes;
+      jobProcesses = map
+        (p: rec { inherit (p) name; cmdline = "exec ./${name}"; })
+        jobAttrs.task.processes;
 
-      job_config = attrs // {
-        task = attrs.task // { inherit processes; };
+      initSandboxProcess = {
+        name = "init_sandbox";
+        cmdline = "cp -Lavr ${sandbox}/* .";
+      };
+
+      processes = [ initSandboxProcess ] ++ jobProcesses;
+
+      constraints = map
+        (p: { order = [ initSandboxProcess.name p.name ]; }) jobProcesses;
+
+      job_config = jobAttrs // {
+        task = jobAttrs.task // { inherit processes constraints; };
       };
 
     in pkgs.writeTextFile {
-      name = with attrs; "aurora-config-${cluster}-${role}-${environment}-${name}";
+      name = with jobAttrs; "aurora-config-${cluster}-${role}-${environment}-${name}";
       text = builtins.toJSON job_config;
       destination = "/config.json";
     };
@@ -72,7 +82,7 @@ rec {
       name = with attrs; "aurora-sandbox-${cluster}-${role}-${environment}-${name}";
       buildCommand = ''
         mkdir -p $out
-        ${pkgs.lib.concatMapStringsSep "\n" (p: "ln -s ${mkProcessDerivation p} $out/${p.name}") task.processes}
+        ${pkgs.lib.concatMapStringsSep "\n" (p: "cp ${mkProcessDerivation p} $out/${p.name}") task.processes}
       '';
     };
 
