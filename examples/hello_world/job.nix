@@ -10,10 +10,9 @@ let
 
   helloWorldProcess = aurora.Process {
     name = "hello_world";
-    cmdline = "${pkgs.nginx}/bin/${pkgs.python.executable} ${deps.helloWorldPy}/hello_world.py";
+    cmdline = "${pkgs.python}/bin/${pkgs.python.executable} ${deps.helloWorldPy}/hello_world.py";
     propagatedBuildInputs = [
       pkgs.python
-      pkgs.nginx
       deps.helloWorldPy
     ];
   };

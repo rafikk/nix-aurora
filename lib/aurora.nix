@@ -58,6 +58,7 @@ rec {
   _sandbox = attrs: with attrs;
 
     let mkProcessDerivation = process: pkgs.stdenv.mkDerivation {
+      inherit (process) propagatedBuildInputs;
       name = "aurora-process-${process.name}";
       preferLocalBuild = true;
       buildCommand = ''
@@ -97,7 +98,6 @@ rec {
     , final ? false
     , min_duration ? 5
     , propagatedBuildInputs ? []
-    , buildInputs ? []
     } @ attrs: attrs;
 
   Resources =
