@@ -11,10 +11,6 @@ let
   helloWorldProcess = aurora.Process {
     name = "hello_world";
     cmdline = "${pkgs.python}/bin/${pkgs.python.executable} ${deps.helloWorldPy}/hello_world.py";
-    propagatedBuildInputs = [
-      pkgs.python
-      deps.helloWorldPy
-    ];
   };
 
   helloWorldTask = aurora.Task {
@@ -29,6 +25,6 @@ let
 in aurora.Service {
   cluster = "devcluster";
   environment = "devel";
-  role = "www-data";
+  role = "vagrant";
   task = helloWorldTask;
 }

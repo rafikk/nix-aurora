@@ -24,66 +24,34 @@ rec {
     } @ attrs:
 
     let
-      jobAttrs = { inherit name; } // attrs;
-      sandbox = _sandbox jobAttrs;
-      config = _config { inherit sandbox jobAttrs; };
 
-    in pkgs.stdenv.mkDerivation {
-      name = "aurora-job-${cluster}-${role}-${environment}-${name}";
-      propagatedBuildInputs = [ config sandbox ];
-      buildCommand = ''
-        mkdir -p $out
-        ln -s ${sandbox} $out/sandbox
-        ln -s ${config}/config.json $out/config.json
-      '';
-    };
-
-  _config = { sandbox, jobAttrs }:
-
-    let
-      jobProcesses = map
-        (p: rec { inherit (p) name; cmdline = "exec ./${name}"; })
-        jobAttrs.task.processes;
-
-      initSandboxProcess = {
-        name = "init_sandbox";
-        cmdline = "cp -Lavr ${sandbox}/* .";
+      mkProcessDerivation = process: pkgs.writeTextFile {
+        name = "aurora-process-${cluster}-${role}-${environment}-${name}-${process.name}";
+        text = process.cmdline;
+        executable = true;
       };
 
-      processes = [ initSandboxProcess ] ++ jobProcesses;
-
-      constraints = map
-        (p: { order = [ initSandboxProcess.name p.name ]; }) jobProcesses;
-
-      job_config = jobAttrs // {
-        task = jobAttrs.task // { inherit processes constraints; };
+      mkInitProcess = process: {
+        name = "nix_init_${process.name}";
+        cmdline = ''
+          . /home/vagrant/.nix-profile/etc/profile.d/nix.sh
+          nix-store --add-root .gc/${process.name} --indirect -r ${mkProcessDerivation process}
+        '';
       };
+
+      initProcesses = map mkInitProcess task.processes;
+
+      processes = initProcesses ++ task.processes;
+
+      constraints = (map
+        (p: { order = [ "nix_init_${p.name}" p.name ]; }) task.processes)
+        ++ task.constraints;
+
+      wrappedTask = task // { inherit processes constraints; };
 
     in pkgs.writeTextFile {
-      name = with jobAttrs; "aurora-config-${cluster}-${role}-${environment}-${name}";
-      text = builtins.toJSON job_config;
-      destination = "/config.json";
-    };
-
-  _sandbox = attrs: with attrs;
-
-    let mkProcessDerivation = process: pkgs.stdenv.mkDerivation {
-      inherit (process) propagatedBuildInputs;
-      name = "aurora-process-${process.name}";
-      preferLocalBuild = true;
-      buildCommand = ''
-        mkdir -p "$(dirname "$out")"
-        echo -n "${process.cmdline}" > "$out"
-        chmod +x "$out"
-      '';
-    };
-
-    in pkgs.stdenv.mkDerivation {
-      name = with attrs; "aurora-sandbox-${cluster}-${role}-${environment}-${name}";
-      buildCommand = ''
-        mkdir -p $out
-        ${pkgs.lib.concatMapStringsSep "\n" (p: "cp ${mkProcessDerivation p} $out/${p.name}") task.processes}
-      '';
+      name = with attrs; "aurora-job-${cluster}-${role}-${environment}-${name}";
+      text = builtins.toJSON (attrs // { inherit name; task = wrappedTask; });
     };
 
   Service = attrs: Job (attrs // { service = true; });
@@ -97,7 +65,7 @@ rec {
     , max_concurrency ? 0
     , finalization_wait ? 30
     } @ attrs:
-    { inherit name; } // attrs;
+    { inherit name constraints; } // attrs;
 
   Process =
     { cmdline
@@ -107,7 +75,6 @@ rec {
     , ephemeral ? false
     , final ? false
     , min_duration ? 5
-    , propagatedBuildInputs ? []
     } @ attrs: attrs;
 
   Resources =
