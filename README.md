@@ -14,10 +14,10 @@ An Aurora job is composed of a Task which consists of one or more Processes. In 
 
 1. Start the Aurora Vagrant VM. Directions [here](http://aurora.apache.org/documentation/latest/vagrant/).
 2. Install Nix using `curl https://nixos.org/nix/install | sh` and source `/home/vagrant/.nix-profile/etc/profile.d/nix.sh`
-3. Clone this repo
+3. `git clone https://github.com/rafikk/nix-aurora.git`
 4. Run `aurora job create --read-json devcluster/vagrant/devel/hello_world $(nix-build --no-out-link examples/hello_world)` to start the job
 
-If you would just like to see the JSON configuration, install Nix and run `cat $(nix-build examples/hello_world --no-out-link) | python -m json.tool`. Here's the output running on my Mac laptop:
+If you would just like to see the JSON configuration, install Nix and run `cat $(nix-build ./nix-aurora/examples/hello_world --no-out-link) | python -m json.tool`. Here's the output running on my Mac laptop:
 
 ```json
 {
