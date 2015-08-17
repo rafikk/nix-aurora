@@ -114,6 +114,40 @@ rec {
     KB = 1024 * B;
     MB = 1024 * KB;
     GB = 1024 * MB;
+
+    files = {
+
+      copiedExpandedFile = filePath:
+
+        let
+          bindingsFile = pkgs.stdenv.mkDerivation {
+            name = pkgs.lib.last (pkgs.lib.strings.splitString "/" (builtins.toString filePath));
+            buildCommand = ''
+              mkdir -p $(dirname $out)
+              ${pkgs.python}/bin/${pkgs.python.executable} -c '\
+                import sys, re, json; \
+                pattern = re.compile(r"""{{&?([^{}]+?)\1?}}"""); \
+                matches = set(pattern.findall(sys.stdin.read())); \
+                output = json.dumps(dict((k, """{{%s}}""" % k) for k in matches)); \
+                sys.stdout.write(output)' \
+                < ${filePath} > $out
+            '';
+          };
+
+          outputPath = pkgs.lib.last (pkgs.lib.strings.splitString "/" (builtins.toString bindingsFile));
+
+        in pkgs.lib.strings.concatStrings (pkgs.lib.strings.splitString "\n" ''
+          $(${pkgs.python}/bin/${pkgs.python.executable} -c '
+          import json, re, sys, os;
+          bindings = json.loads("""${builtins.readFile bindingsFile}""");
+          pattern = re.compile(r"""{{&?([^{}]+?)\1?}}""");
+          sys.stdout.write(pattern.sub(lambda m: bindings.get(m.group(1)), sys.stdin.read()))'
+          < ${filePath}
+          > ${outputPath};
+          echo ${outputPath})'');
+
+    };
+
   };
 
 }

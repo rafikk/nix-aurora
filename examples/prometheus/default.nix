@@ -6,17 +6,11 @@ let
 
   aurora = import ../../lib/aurora.nix { inherit pkgs; };
 
-  files = pkgs.stdenv.mkDerivation rec {
-    name = "files";
-    src = ./files;
-    buildCommand = "mkdir -p $out && cp ${src}/* $out/";
-  };
-
   prometheusProcess = aurora.Process {
     name = "prometheus";
     cmdline = ''
       ${pkgs.prometheus}/bin/prometheus \
-        -config.file ${files}/prometheus.yml \
+        -config.file ${aurora.utils.files.copiedExpandedFile ./files/prometheus.yml} \
         -web.listen-address 0.0.0.0:{{thermos.ports[http]}} \
         -log.level=debug
       '';
