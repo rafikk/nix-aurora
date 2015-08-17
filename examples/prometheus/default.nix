@@ -10,14 +10,16 @@ let
     name = "prometheus";
     cmdline = ''
       ${pkgs.prometheus}/bin/prometheus \
-        -config.file ${aurora.utils.files.copiedExpandedFile ./files/prometheus.yml} \
-        -web.listen-address 0.0.0.0:{{thermos.ports[http]}} \
+        -config.file=${aurora.utils.files.copiedExpandedFile ./files/prometheus.yml} \
+        -web.listen-address=0.0.0.0:{{thermos.ports[http]}} \
         -log.level=debug
       '';
   };
 
   prometheusTask = aurora.Task {
-    processes = [ prometheusProcess ];
+    processes = [
+      prometheusProcess
+    ];
     resources = {
       cpu = 1;
       ram = 8 * aurora.utils.MB;
